@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Online Election System</title>
+
+<style>
+
+body{
+font-family:Arial;
+margin:40px;
+}
+
+section{
+border:1px solid #ccc;
+padding:20px;
+margin-bottom:20px;
+}
+
+button{
+padding:8px 15px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Election Voting System</h1>
+
+<section>
+
+<h2>Vote</h2>
+
+<label>Voter</label>
+<select id="voter"></select>
+
+<br><br>
+
+<label>Candidate</label>
+<select id="candidate"></select>
+
+<br><br>
+
+<button onclick="submitVote()">Submit Vote</button>
+
+<p id="msg"></p>
+
+</section>
+
+<section>
+
+<h2>Results</h2>
+
+<button onclick="loadResults()">Show Results</button>
+
+<ul id="results"></ul>
+
+</section>
+
+<script>
+
+const API = "https://script.google.com/macros/s/AKfycbzEV9EhApG0k84nWOH0te8WEDzCPhXYiHIvUVOMsnI4kZIm9fyuj4DBopsz71JlVO0/exec";
+
+async function loadCandidates(){
+
+let res = await fetch(API+"?action=getCandidates");
+let data = await res.json();
+
+let select = document.getElementById("candidate");
+
+for(let i=1;i<data.length;i++){
+
+let option=document.createElement("option");
+option.value=data[i][1];
+option.text=data[i][1];
+
+select.appendChild(option);
+
+}
+
+}
+
+async function loadVoters(){
+
+let res = await fetch(API+"?action=getVoters");
+let data = await res.json();
+
+let select = document.getElementById("voter");
+
+for(let i=1;i<data.length;i++){
+
+if(data[i][2] == "NO"){
+
+let option=document.createElement("option");
+option.value=data[i][0];
+option.text=data[i][1];
+
+select.appendChild(option);
+
+}
+
+}
+
+}
+
+async function submitVote(){
+
+let voter = document.getElementById("voter").value;
+let candidate = document.getElementById("candidate").value;
+
+let res = await fetch(API,{
+method:"POST",
+body:JSON.stringify({
+action:"vote",
+voterId:voter,
+candidate:candidate
+})
+});
+
+let msg = await res.text();
+
+document.getElementById("msg").innerText = msg;
+
+}
+
+async function loadResults(){
+
+let res = await fetch(API+"?action=results");
+let data = await res.json();
+
+let count = {};
+
+for(let i=1;i<data.length;i++){
+
+let c = data[i][1];
+
+if(!count[c]) count[c]=0;
+
+count[c]++;
+
+}
+
+let ul = document.getElementById("results");
+ul.innerHTML="";
+
+for(let c in count){
+
+let li = document.createElement("li");
+li.innerText = c + " : " + count[c] + " votes";
+
+ul.appendChild(li);
+
+}
+
+}
+
+loadCandidates();
+loadVoters();
+
+</script>
+
+</body>
+
+</html>
