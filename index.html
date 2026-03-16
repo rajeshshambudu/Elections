@@ -1,165 +1,139 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Online Election System</title>
-
-<style>
-
-body{
-font-family:Arial;
-margin:40px;
-}
-
-section{
-border:1px solid #ccc;
-padding:20px;
-margin-bottom:20px;
-}
-
-button{
-padding:8px 15px;
-}
-
-</style>
-
+    <title>Online Election System</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7f6; color: #333; }
+        section { background: white; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        select, button { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #ccc; }
+        #msg { font-weight: bold; text-align: center; color: #e67e22; }
+        ul { list-style: none; padding: 0; }
+        li { background: #eee; margin: 5px 0; padding: 10px; border-left: 5px solid #3498db; }
+    </style>
 </head>
-
 <body>
 
-<h1>Election Voting System</h1>
+    <h1>Election Voting System</h1>
 
-<section>
+    <section>
+        <h2>Cast Your Vote</h2>
+        <label>Select Your Name/ID</label>
+        <select id="voter"><option>Loading voters...</option></select>
 
-<h2>Vote</h2>
+        <label>Select Candidate</label>
+        <select id="candidate"><option>Loading candidates...</option></select>
 
-<label>Voter</label>
-<select id="voter"></select>
+        <button id="submitBtn" onclick="submitVote()">Submit Vote</button>
+        <p id="msg"></p>
+    </section>
 
-<br><br>
-
-<label>Candidate</label>
-<select id="candidate"></select>
-
-<br><br>
-
-<button onclick="submitVote()">Submit Vote</button>
-
-<p id="msg"></p>
-
-</section>
-
-<section>
-
-<h2>Results</h2>
-
-<button onclick="loadResults()">Show Results</button>
-
-<ul id="results"></ul>
-
-</section>
+    <section>
+        <h2>Live Results</h2>
+        <button onclick="loadResults()">Refresh Results</button>
+        <ul id="results"></ul>
+    </section>
 
 <script>
+    const API = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
-const API = "https://script.google.com/macros/s/AKfycbzEV9EhApG0k84nWOH0te8WEDzCPhXYiHIvUVOMsnI4kZIm9fyuj4DBopsz71JlVO0/exec";
+    async function loadCandidates() {
+        try {
+            let res = await fetch(API + "?action=getCandidates");
+            let data = await res.json();
+            let select = document.getElementById("candidate");
+            select.innerHTML = ""; 
+            for(let i=1; i<data.length; i++) {
+                let option = document.createElement("option");
+                option.value = data[i][0]; // Assuming ID is col 1
+                option.text = data[i][1];  // Assuming Name is col 2
+                select.appendChild(option);
+            }
+        } catch(e) { console.error("Error loading candidates", e); }
+    }
 
-async function loadCandidates(){
+    async function loadVoters() {
+        try {
+            let res = await fetch(API + "?action=getVoters");
+            let data = await res.json();
+            let select = document.getElementById("voter");
+            select.innerHTML = "";
+            for(let i=1; i<data.length; i++) {
+                if(data[i][2] !== "YES") { // Only show those who haven't voted
+                    let option = document.createElement("option");
+                    option.value = data[i][0];
+                    option.text = data[i][1];
+                    select.appendChild(option);
+                }
+            }
+        } catch(e) { console.error("Error loading voters", e); }
+    }
 
-let res = await fetch(API+"?action=getCandidates");
-let data = await res.json();
+    async function submitVote() {
+        const btn = document.getElementById("submitBtn");
+        const msg = document.getElementById("msg");
+        const voterId = document.getElementById("voter").value;
+        const candidate = document.getElementById("candidate").value;
 
-let select = document.getElementById("candidate");
+        if(!voterId) { alert("Please select a voter"); return; }
 
-for(let i=1;i<data.length;i++){
+        btn.disabled = true;
+        msg.innerText = "Processing vote...";
 
-let option=document.createElement("option");
-option.value=data[i][1];
-option.text=data[i][1];
+        try {
+            // Using follow redirect for GAS
+            let res = await fetch(API, {
+                method: "POST",
+                body: JSON.stringify({
+                    action: "vote",
+                    voterId: voterId,
+                    candidate: candidate
+                })
+            });
 
-select.appendChild(option);
+            let responseText = await res.text();
+            msg.innerText = responseText;
+            
+            // Refresh lists
+            await loadVoters();
+            loadResults();
+        } catch (e) {
+            msg.innerText = "Error submitting vote. Check console.";
+            console.error(e);
+        } finally {
+            btn.disabled = false;
+        }
+    }
 
-}
+    async function loadResults() {
+        try {
+            let res = await fetch(API + "?action=results");
+            let data = await res.json();
+            let count = {};
 
-}
+            for(let i=1; i<data.length; i++) {
+                let c = data[i][2]; // Candidate name is in 3rd column now (Date, ID, Name)
+                count[c] = (count[c] || 0) + 1;
+            }
 
-async function loadVoters(){
+            let ul = document.getElementById("results");
+            ul.innerHTML = "";
+            for(let c in count) {
+                let li = document.createElement("li");
+                li.innerText = `${c} : ${count[c]} votes`;
+                ul.appendChild(li);
+            }
+        } catch(e) { console.error("Error loading results", e); }
+    }
 
-let res = await fetch(API+"?action=getVoters");
-let data = await res.json();
-
-let select = document.getElementById("voter");
-
-for(let i=1;i<data.length;i++){
-
-if(data[i][2] == "NO"){
-
-let option=document.createElement("option");
-option.value=data[i][0];
-option.text=data[i][1];
-
-select.appendChild(option);
-
-}
-
-}
-
-}
-
-async function submitVote(){
-
-let voter = document.getElementById("voter").value;
-let candidate = document.getElementById("candidate").value;
-
-let res = await fetch(API,{
-method:"POST",
-body:JSON.stringify({
-action:"vote",
-voterId:voter,
-candidate:candidate
-})
-});
-
-let msg = await res.text();
-
-document.getElementById("msg").innerText = msg;
-
-}
-
-async function loadResults(){
-
-let res = await fetch(API+"?action=results");
-let data = await res.json();
-
-let count = {};
-
-for(let i=1;i<data.length;i++){
-
-let c = data[i][1];
-
-if(!count[c]) count[c]=0;
-
-count[c]++;
-
-}
-
-let ul = document.getElementById("results");
-ul.innerHTML="";
-
-for(let c in count){
-
-let li = document.createElement("li");
-li.innerText = c + " : " + count[c] + " votes";
-
-ul.appendChild(li);
-
-}
-
-}
-
-loadCandidates();
-loadVoters();
-
+    // Initial Load
+    loadCandidates();
+    loadVoters();
 </script>
 
 </body>
-
 </html>
